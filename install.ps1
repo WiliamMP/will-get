@@ -1,4 +1,4 @@
-﻿# Installs only the `will` command; apps are installed one by one with it. After formatting the PC:
+# Installs only the `will` command; apps are installed one by one with it. After formatting the PC:
 #   irm https://raw.githubusercontent.com/WiliamMP/will-get/main/install.ps1 | iex
 
 $ErrorActionPreference = 'Stop'
