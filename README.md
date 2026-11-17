@@ -8,7 +8,7 @@ After formatting the PC, in PowerShell:
 irm https://raw.githubusercontent.com/WiliamMP/will-get/main/install.ps1 | iex
 ```
 
-That installs the `will` command and every app. Then:
+That installs only the `will` command. Then:
 
 ```
 will list

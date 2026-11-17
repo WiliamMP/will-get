@@ -1,4 +1,4 @@
-﻿# Installs the `will` command and then every app. After formatting the PC:
+﻿# Installs only the `will` command; apps are installed one by one with it. After formatting the PC:
 #   irm https://raw.githubusercontent.com/WiliamMP/will-get/main/install.ps1 | iex
 
 $ErrorActionPreference = 'Stop'
@@ -13,4 +13,4 @@ $path = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (($path -split ';') -notcontains $dir) { [Environment]::SetEnvironmentVariable('Path', "$path;$dir", 'User') }
 $env:Path += ";$dir"
 
-will install --all
+Write-Host "will instalado. Abra um terminal novo e use: will list | will install <app> | will install --all"
