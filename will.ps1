@@ -15,11 +15,21 @@ $api = 'https://api.github.com'
 $cmd, $apps = $args
 
 # the one API call per command; GITHUB_TOKEN, if set, lifts the 60/hour limit
+# The last good list is kept next to the script and used when the API fails.
 function Get-Catalog {
+  $cache = Join-Path $PSScriptRoot 'catalog.txt'
   $headers = @{}
   if ($env:GITHUB_TOKEN) { $headers.Authorization = "Bearer $env:GITHUB_TOKEN" }
-  Invoke-RestMethod "$api/users/$owner/repos?per_page=100" -Headers $headers |
-    ForEach-Object { $_ } | Where-Object { $_.topics -contains 'will-app' } | ForEach-Object { $_.name } | Sort-Object
+  try {
+    $names = Invoke-RestMethod "$api/users/$owner/repos?per_page=100" -Headers $headers |
+      ForEach-Object { $_ } | Where-Object { $_.topics -contains 'will-app' } | ForEach-Object { $_.name } | Sort-Object
+    Set-Content $cache $names
+    $names
+  } catch {
+    if (-not (Test-Path $cache)) { throw "GitHub indisponível e sem lista salva: $($_.Exception.Message)" }
+    Write-Warning 'GitHub API indisponível (limite de 60/hora?), usando a última lista salva'
+    Get-Content $cache
+  }
 }
 
 # the uninstall entry the NSIS installer writes (version and uninstaller path)
