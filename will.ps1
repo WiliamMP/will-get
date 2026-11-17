@@ -102,7 +102,7 @@ switch ($cmd) {
     # self-update first; only the installed copy, never a checkout of the repo.
     # Safe while running: PowerShell has already read the whole script.
     if ($PSScriptRoot -eq (Join-Path $env:LOCALAPPDATA 'will')) {
-      $self = Join-Path $PSScriptRoot 'will.ps1'
+      $self = $PSCommandPath
       $new = "$self.new" # bytes straight to a file: .Content would be decoded as Latin-1 on 5.1
       Invoke-WebRequest 'https://raw.githubusercontent.com/WiliamMP/will-get/main/will.ps1' -OutFile $new -UseBasicParsing
       $b64 = { param($f) [Convert]::ToBase64String([IO.File]::ReadAllBytes($f)) } # Get-FileHash fails on 5.1 started from pwsh 7
