@@ -14,7 +14,7 @@ That installs only the `will` command. Then:
 will list
 will install will-repo
 will install --all
-will update
+will update            # updates will itself too
 will uninstall will-repo
 ```
 

@@ -5,7 +5,7 @@
 #   will list                 apps, installed and latest version
 #   will install <app>...     install or reinstall
 #   will install --all
-#   will update               install newer versions of what is installed
+#   will update               update will itself, then newer versions of what is installed
 #   will uninstall <app>...   remove (silent uninstaller); --all removes every installed app
 
 $ErrorActionPreference = 'Stop'
@@ -14,8 +14,11 @@ $owner = 'WiliamMP'
 $api = 'https://api.github.com'
 $cmd, $apps = $args
 
+# the one API call per command; GITHUB_TOKEN, if set, lifts the 60/hour limit
 function Get-Catalog {
-  Invoke-RestMethod "$api/users/$owner/repos?per_page=100" |
+  $headers = @{}
+  if ($env:GITHUB_TOKEN) { $headers.Authorization = "Bearer $env:GITHUB_TOKEN" }
+  Invoke-RestMethod "$api/users/$owner/repos?per_page=100" -Headers $headers |
     ForEach-Object { $_ } | Where-Object { $_.topics -contains 'will-app' } | ForEach-Object { $_.name } | Sort-Object
 }
 
@@ -39,10 +42,17 @@ function Uninstall-App($name) {
   Start-Process $k.UninstallString.Trim('"') -ArgumentList '/S' -Wait
 }
 
+# Not the API (60 requests/hour without login): github.com/<repo>/releases/latest
+# redirects to .../releases/tag/<tag>, and the Tauri setup is named <app>_<version>_x64-setup.exe.
+# ponytail: assumes productName == repo name; read the release assets via the API if one differs
 function Get-Latest($name) {
-  try { $r = Invoke-RestMethod "$api/repos/$owner/$name/releases/latest" } catch { return $null }
-  $asset = $r.assets | Where-Object { $_.name -like '*-setup.exe' } | Select-Object -First 1
-  if ($asset) { [pscustomobject]@{ Version = $r.tag_name.TrimStart('v'); Url = $asset.browser_download_url; File = $asset.name } }
+  try { $r = Invoke-WebRequest "https://github.com/$owner/$name/releases/latest" -Method Head -UseBasicParsing } catch { return $null }
+  $uri = if ($r.BaseResponse.ResponseUri) { $r.BaseResponse.ResponseUri } else { $r.BaseResponse.RequestMessage.RequestUri } # 5.1 / 7
+  if ("$uri" -notmatch '/releases/tag/(.+)$') { return $null } # no release yet
+  $tag = $Matches[1]
+  $version = $tag.TrimStart('v')
+  $file = "${name}_${version}_x64-setup.exe"
+  [pscustomobject]@{ Version = $version; Url = "https://github.com/$owner/$name/releases/download/$tag/$file"; File = $file }
 }
 
 function Install-App($name, $latest) {
@@ -79,6 +89,18 @@ switch ($cmd) {
     }
   }
   'update' {
+    # self-update first; only the installed copy, never a checkout of the repo.
+    # Safe while running: PowerShell has already read the whole script.
+    if ($PSScriptRoot -eq (Join-Path $env:LOCALAPPDATA 'will')) {
+      $self = Join-Path $PSScriptRoot 'will.ps1'
+      $new = "$self.new" # bytes straight to a file: .Content would be decoded as Latin-1 on 5.1
+      Invoke-WebRequest 'https://raw.githubusercontent.com/WiliamMP/will-get/main/will.ps1' -OutFile $new -UseBasicParsing
+      $b64 = { param($f) [Convert]::ToBase64String([IO.File]::ReadAllBytes($f)) } # Get-FileHash fails on 5.1 started from pwsh 7
+      if ((& $b64 $new) -ne (& $b64 $self)) {
+        Move-Item $new $self -Force
+        Write-Host 'will atualizado'
+      } else { Remove-Item $new }
+    }
     $n = 0
     foreach ($app in $catalog) {
       $have = Get-Installed $app
