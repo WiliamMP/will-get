@@ -15,6 +15,7 @@ will list
 will install will-repo
 will install --all
 will update
+will uninstall will-repo
 ```
 
 To add an app: give its repo the `will-app` topic and publish a release with a `-setup.exe`.

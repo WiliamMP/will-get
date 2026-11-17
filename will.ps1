@@ -6,6 +6,7 @@
 #   will install <app>...     install or reinstall
 #   will install --all
 #   will update               install newer versions of what is installed
+#   will uninstall <app>...   remove (silent uninstaller); --all removes every installed app
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is very slow with the progress bar on
@@ -18,12 +19,24 @@ function Get-Catalog {
     ForEach-Object { $_ } | Where-Object { $_.topics -contains 'will-app' } | ForEach-Object { $_.name } | Sort-Object
 }
 
-# installed version, from the uninstall entry the NSIS installer writes
-function Get-Installed($name) {
+# the uninstall entry the NSIS installer writes (version and uninstaller path)
+function Get-Entry($name) {
   $keys = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
           'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
-  $k = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq $name } | Select-Object -First 1
+  Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq $name } | Select-Object -First 1
+}
+
+function Get-Installed($name) {
+  $k = Get-Entry $name
   if ($k) { $k.DisplayVersion }
+}
+
+function Uninstall-App($name) {
+  $k = Get-Entry $name
+  if (-not $k) { Write-Warning "${name}: não está instalado"; return }
+  Write-Host "${name} $($k.DisplayVersion): desinstalando"
+  # ponytail: the NSIS uninstaller relaunches itself from %TEMP%, so -Wait returns before it finishes
+  Start-Process $k.UninstallString.Trim('"') -ArgumentList '/S' -Wait
 }
 
 function Get-Latest($name) {
@@ -76,5 +89,10 @@ switch ($cmd) {
     }
     if (-not $n) { Write-Host 'tudo atualizado' }
   }
-  default { 'uso: will list | will install <app>... | will install --all | will update' }
+  'uninstall' {
+    if ($apps -contains '--all') { $apps = $catalog | Where-Object { Get-Installed $_ } }
+    if (-not $apps) { throw 'uso: will uninstall <app>... | will uninstall --all' }
+    foreach ($n in $apps) { Uninstall-App $n }
+  }
+  default { 'uso: will list | will install <app>... | will install --all | will update | will uninstall <app>...' }
 }
